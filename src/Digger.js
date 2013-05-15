@@ -19,8 +19,10 @@
  *               5.2 tagname: 对象，配置当监控节点的节点类型符合某种类型时要从节点中获取的属性数据
  *      
  */
-(function (win, doc) {
-        //默认配置项
+//防止同一个页面引用多个Digger
+
+window.Digger = window.Digger || (function (win, doc) {
+    //默认配置项
     var DEFAULT_CONFIG = {
             //点击日志接受地址
             url     : 'http://localhost/github/digger/log.data',
@@ -58,6 +60,14 @@
             'enter' : 'mouseover',
             'leave' : 'mouseout'
         },
+        //记录tag + event_type是否全局绑定过，防止重复的绑定
+        isBind = {},
+        //保持当前创建的所有的log对象的列表
+        objs = {}, 
+
+        //记录
+        isReady = false,
+
         E = encodeURIComponent,
         ref = doc.referrer,
         loc = win.location,
@@ -105,6 +115,17 @@
          */
         rand: function (min, max) {
             return Math.floor(min + Math.random() * (max - min + 1));
+        },
+        /**
+         * 简单扩展一个对象
+         * @param  {[type]} destination [description]
+         * @param  {[type]} source      [description]
+         * @return {[type]}             [description]
+         */
+        extend: function (des, src) {
+            for (var k in src) {
+                des[k] = des[k] || src[k];
+            }
         },
         /**
          * 设置默认值，如果opt存在，使用opt的值
@@ -162,6 +183,92 @@
                 dom.attachEvent('on' + type, handler);
             }
         },
+        /**
+         * dom ready方法
+         * @param  {[type]} doc [description]
+         * @param  {[type]} win [description]
+         * @return {[type]}     [description]
+         */
+        ready : (function (doc, win) {
+            var isReady = 0,
+                isBind = 0,
+                fns = [],
+                testEl = doc.createElement('p');
+
+            function bindReady() {
+                if (isBind) return;
+                isBind = 1;
+
+                // Catch cases where domReady is called after the browser event has already occurred.
+                // readyState: "uninitalized"、"loading"、"interactive"、"complete" 、"loaded"
+                if (doc.readyState === "complete") {
+                    init();
+                } else if (doc.addEventListener) {
+                    doc.addEventListener("DOMContentLoaded", function () {
+                        doc.removeEventListener("DOMContentLoaded", arguments.callee, false);
+                        init();
+                    }, false);
+                    win.addEventListener("onload", init, false);
+                } else if(doc.attachEvent) {
+                    // In IE, ensure firing before onload, maybe late but safe also for iframes.
+                    doc.attachEvent("onreadystatechange", function() {
+                        if (doc.readyState === "complete") {
+                            doc.detachEvent("onreadystatechange", arguments.callee);
+                            init();
+                        }
+                    });
+                    win.attachEvent("onload", init);
+
+                    // If IE and not a frame, continually check to see if the document is ready.
+                    if(testEl.doScroll && win == win.top){
+                        doScrollCheck();
+                    }
+                }
+            };
+
+            // Process items when the DOM is ready.
+            function init() {
+                isReady = 1;
+
+                // Make sure body exists, at least, in case IE gets a little overzealous.
+                // This is taked directly from jQuery's implementation.
+                if (!doc.body) {
+                    setTimeout(init, 10);
+                    return;
+                }
+
+                for (var i = 0, l = fns.length; i < l; i++) {
+                    fns[i]();
+                }
+                fns = [];
+            };
+
+            function doScrollCheck() {
+                if(isReady) return;
+
+                try {
+                    // If IE is used, use the trick by Diego Perini
+                    // http://javascript.nwbox.com/IEContentLoaded/
+                    testEl.doScroll('left');
+                } catch (e) {
+                    setTimeout(doScrollCheck, 10);
+                    return;
+                }
+
+                init();
+            }
+
+            return function(fn){
+                bindReady(fn);
+
+                if (isReady) {
+                    fn();
+                } else {
+                    fns.push(fn);
+                }
+            };
+
+        })(doc, win),
         /**
          * 获取dom中data-name 标识的属性值
          * @param  {DOM}    dom  要获取属性的节点 
@@ -232,16 +339,44 @@
      * @params  {Object}    opt_options     配置参数，描述见DEFAULT_CONFIG
      */
     function Digger(opt_options) {
-        var options = opt_options || {};
+        var options = opt_options || {},
+            thiz;
 
-        //缓存数组，不该被改变
-        this._tracks = {};
         //记录前缀，标识一个唯一记录集合
-        this.name = options.name || 'digger' + util.rnd();
+        this.tag = options.tag || DEFAULT_CONFIG.tag;
 
-        util.setDefault(this, opt_options || {}, DEFAULT_CONFIG);
+        thiz = objs[this.tag] || this;
 
-        this.init();
+        //如果已经初始化了一个同名的digger实例，那么直接返回这个对象，没有添加name的new返回默认生成的对象
+        if (!objs[this.tag]) {
+
+            //把生成的对象记录到全局管理中
+            objs[this.tag] = this;
+
+            //缓存数组，不该被改变
+            this._tracks = {};
+
+            util.setDefault(this, opt_options || {}, DEFAULT_CONFIG);
+
+            //在页面卸载前把没有发出的数据发出
+            util.on(win, 'beforeunload', function () {
+                for (var key in thiz._tracks) {
+                    thiz.send(key, 0);
+                }
+                thiz.log(thiz.format())
+            });
+        }
+
+        //根据事件配置初始化监控行为并完成该次的onload和unload处理
+        util.ready(function () {
+            thiz.initMo(
+                options.tag  || DEFAULT_CONFIG.tag,
+                options.max  || DEFAULT_CONFIG.max,
+                options.type || DEFAULT_CONFIG.type
+            );
+        });
+
+        return thiz;
     }
 
     Digger.prototype = {
@@ -249,9 +384,8 @@
          * 初始化方法，根据this.type的配置声明绑定相应的记录事件
          * @return
          */
-        init : function () {
-            var types = this.type,
-                type,
+        initMo : function (tag, max, types) {
+            var type,
                 thiz = this,
                 loadMsg, unloadMsg,//加载或者卸载时的附加数据
                 start = +new Date(); //记录进入页面时间
@@ -259,28 +393,35 @@
             for (var key in types) {
                 type = types[key] || {};
 
-                //设置每个事件类型的监控标识符tag和最大缓冲数量
-                //如果类型中没有配置，则使用全局配置
-                //全局配置默认使用DEFAULT_CONFIG的值
-                util.setDefault(type, type, {
-                    tag : this.tag,
-                    max : this.max,
-                    type : key
-                });
-
                 //初始化该事件类型的缓冲区
-                this._tracks[key] = [];
+                this._tracks[key] = this._tracks[key] || [];
 
                 //绑定,这里会排除onload跟unload两个事件类型，后面特殊处理
-                BIND_MAP[key] && util.delegate(document.body, BIND_MAP[key], this._getCallbackHandler(type), type.tag);
+                //且如果全局未绑定tag + event_type
+                //这里如果绑定过max重新指定不起作用
+                if (BIND_MAP[key] && !isBind[tag + '|' + key]) {
+                    //设置每个事件类型的监控标识符tag和最大缓冲数量
+                    //如果类型中没有配置，则使用全局配置
+                    //全局配置默认使用DEFAULT_CONFIG的值
+                    util.setDefault(type, type, {
+                        tag : tag,
+                        max : max,
+                        type : key
+                    });
+
+                    util.delegate(win, BIND_MAP[key], this._getCallbackHandler(type), type.tag);
+                    
+                    //标记tag + key这种类型已经被绑定过了
+                    isBind[tag + '|' + key] = 1;
+                }
             }
 
             //处理onload事件
             if (types.load) {
                 util.setDefault(types.load, types.load, {
-                    tag : this.tag
+                    tag : tag
                 });
-                loadMsg = this.strProp2jsonProp(util.getAttr(doc.body, types.load.tag));
+                loadMsg = this.strProp2jsonProp(types.load.msg || util.getAttr(doc.body, types.load.tag));
                 loadMsg['_ev'] = 'load';
                 loadMsg['_t'] = (+new Date());
                 this.log(this.format(loadMsg));
@@ -288,9 +429,9 @@
 
             if (types.unload) {
                 util.setDefault(types.unload, types.unload, {
-                    tag : this.tag
+                    tag : tag
                 });
-                unloadMsg = this.strProp2jsonProp(util.getAttr(doc.body, types.unload.tag));
+                unloadMsg = this.strProp2jsonProp(types.unload.msg || util.getAttr(doc.body, types.unload.tag));
                 util.on(window, 'beforeunload', function () {
                     var end = (+new Date());
                     unloadMsg['_dur'] = end - start;
@@ -299,14 +440,6 @@
                     thiz.log(thiz.format(unloadMsg));
                 });
             }
-            //在页面卸载前把没有发出的数据发出
-            util.on(window, 'beforeunload', function () {
-                for (var key in types) {
-                    type = types[key];
-                    thiz.send(key, 0);
-                }
-                thiz.log(thiz.format())
-            });
         },
         /**
          * 将obj转成string的方法, 可被重载，用于生成满足需求格式的数据内容
@@ -399,7 +532,7 @@
          */
         log : function (msg) {
             var img = new Image(1, 1);
-                key = this.name + '_' + util.rnd();
+                key = this.tag + '_' + util.rnd();
 
             window[key] = img;
             img.onload = img.onerror = img.onabort = function () {
@@ -408,7 +541,7 @@
                 img = null;
             };
 
-            img.src = this.getUrl() + '?log=' + this.name + '&ref=' + E(ref) + '&top=' + E(top) + (gloPar ? '&' + gloPar : '') + '&t=' + (+new Date()) + '&msg=' + E(msg);
+            img.src = this.getUrl() + '?log=' + this.tag + '&ref=' + E(ref) + '&top=' + E(top) + (gloPar ? '&' + gloPar : '') + '&t=' + (+new Date()) + '&msg=' + E(msg);
         },
 
         /**
@@ -452,5 +585,14 @@
         }
     };
 
-    win.Digger = Digger;
+    /**
+     * 从当前已经生成的log对象中取出名字为tag的对象
+     */
+    Digger.getObjs = function (tag) {
+        return objs.tag;
+    };
+
+    return Digger;
 })(window, document);
+
+new Digger();

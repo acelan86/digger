@@ -15,6 +15,7 @@
                 margin:10px;
             }
         </style>
+        <script src="src/Digger.js"></script>
     <head>
     <body mo="pdps:aaaa">
         <div id="a">
@@ -23,19 +24,26 @@
         <div id="b">
             <a target="_blank" href="http://sina.com" mo="{c:1,d:2}">link</a>
         </div>
-        <div id="c" mo="a:1;b:2" remarks="1"></div>
-        <div id="d">leave</div>
+        <div id="c" mo="a:1;b:2" pdps="abc:1" remarks="1"></div>
+        <div id="d" pdps="psps:2212">leave</div>
         <div id="e">enter</div>
         <div id="f">click</div>
         <div id="g">move</div>
         <script src="src/Digger.js"></script>
         <script>
             new Digger({
+                tag : 'pdps',
                 url : [
                     "http://localhost/log1",
                     "http://localhost/log2",
                     "http://localhost/log3"
-                ]
+                ],
+                type : {
+                    load: {
+                        msg : "a:1;b:2"
+                    },
+                    click : {}
+                }
             });
         </script>
     </body>
