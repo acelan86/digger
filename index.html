@@ -15,36 +15,34 @@
                 margin:10px;
             }
         </style>
-        <script src="src/Digger.js"></script>
+        <script src="src/new.js" digger="pdps:44444444"></script>
     <head>
-    <body mo="pdps:aaaa">
-        <div id="a">
-            <div id="b">innerCLICK</div>
+    <body>
+        <!-- head中引入监控的广告-->
+        <div digger="pdps22222_12323434_1">
+            <span mo>scriptinhead</span>
         </div>
-        <div id="b">
-            <a target="_blank" href="http://sina.com" mo="{c:1,d:2}">link</a>
-        </div>
-        <div id="c" mo="a:1;b:2" pdps="abc:1" remarks="1"></div>
-        <div id="d" pdps="psps:2212">leave</div>
-        <div id="e">enter</div>
-        <div id="f">click</div>
-        <div id="g">move</div>
-        <script src="src/Digger.js"></script>
+        <!-- 同步方式document.write引入广告-->
         <script>
-            new Digger({
-                tag : 'pdps',
-                url : [
-                    "http://localhost/log1",
-                    "http://localhost/log2",
-                    "http://localhost/log3"
-                ],
-                type : {
-                    load: {
-                        msg : "a:1;b:2"
-                    },
-                    click : {}
-                }
-            });
+            document.write('<div id="xx" mo>sync ad</div>');
+            document.write('<script src="src/new.js" digger="pdps22222_12323434_1">' + '<' + '/script>');
+        </script>
+
+        <!-- body中的广告 -->
+        <div mo>scriptinbody</div>
+        <script src="src/new.js" digger="pdps:pdps0000000"></script>
+
+        <script>
+            //异步加载方式引入广告
+            var div = document.createElement('div');
+            div.setAttribute('mo', '');
+            div.innerHTML = 'async ad';
+            document.body.insertBefore(div, document.body.firstChild);
+
+            var script = document.createElement('script');
+            script.src = 'src/new.js';
+            script.setAttribute('digger', 'pdps:pdps1111111');
+            document.body.insertBefore(script, document.body.firstChild);
         </script>
     </body>
 </html>
