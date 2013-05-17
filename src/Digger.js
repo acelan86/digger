@@ -20,11 +20,12 @@
  *      
  */
 //防止同一个页面引用多个Digger
-window.Digger = window.Digger || (function (win, doc) {
+window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
     var util = {
         E : win.encodeURIComponent,
         ref : doc.referrer,
         loc : win.location,
+        ifr : win.self != win.top ? 1 : 0,
         top : (function () {
             var top;
             try {
@@ -322,48 +323,13 @@ window.Digger = window.Digger || (function (win, doc) {
         }
     };
 
-    var DEFAULT_CONFIG = {
-            //点击日志接受地址
-            url: [
-                'http://localhost/github/digger/log1.data',
-                'http://localhost/github/digger/log2.data',
-                'http://localhost/github/digger/log3.data'
-            ],
-            //缓冲区大小，可以被事件类型中的配置覆盖
-            max: 1,
-            //全局监控标签，可以被事件类型中配置覆盖
-            tag: 'mo',
-            //监控事件类型
-            type: {
-                'click': {
-                    'tag': 'clk'
-                },
-                'enter' : {
-                    'tag': 'enter',
-                    'max': 10
-                },
-                'leave' : {
-                    'tag' : 'leave',
-                    'max' : 30
-                },
-                'load' : {},
-                'unload' : {}
-            },
-            //附加数据配置
-            exdata : {
-                glo : ['remarks'],
-                tagname : {
-                    'A' : ['href']
-                }
-            }
-        },
-        //配置的事件类型对应的绑定事件类型
-        BIND_MAP = {
-            'click' : 'click',
-            'move'  : 'mousemove',
-            'enter' : 'mouseover',
-            'leave' : 'mouseout'
-        };
+    //配置的事件类型对应的绑定事件类型
+    var BIND_MAP = {
+        'click' : 'click',
+        'move'  : 'mousemove',
+        'enter' : 'mouseover',
+        'leave' : 'mouseout'
+    };
 
     //获取全局传递参数，通过url传入以_dg_开头
     var gloPar = (function () {
@@ -554,9 +520,9 @@ window.Digger = window.Digger || (function (win, doc) {
 
             img.src = url
                 + '?log=' + this.uid
-                + (info ? '&' + info : '')
+                + '&ifr=' + util.ifr
                 + '&ref=' + util.E(util.ref)
-                + '&top=' + util.E(top)
+                + '&top=' + util.E(util.top)
                 + (gloPar ? '&' + gloPar : '')
                 + '&t=' + (+new Date())
                 + '&msg=' + util.E(msg);
@@ -605,11 +571,46 @@ window.Digger = window.Digger || (function (win, doc) {
                 util.find('script', 'digger'), 
                 function (script, i) {
                     !digger && (digger = new Digger(DEFAULT_CONFIG));
+                    //注册曝光事件
                     digger.register(util.getAttr(script, 'digger'));
                 }
             );
         });
     };
-})(window, document);
+})(window, document, {
+    //点击日志接受地址
+    url: [
+        'http://localhost/github/digger/log1.data',
+        'http://localhost/github/digger/log2.data',
+        'http://localhost/github/digger/log3.data'
+    ],
+    //缓冲区大小，可以被事件类型中的配置覆盖
+    max: 1,
+    //全局监控标签，可以被事件类型中配置覆盖
+    tag: 'mo',
+    //监控事件类型
+    type: {
+        'click': {
+            'tag': 'clk'
+        },
+        'enter' : {
+            'tag': 'enter',
+            'max': 10
+        },
+        'leave' : {
+            'tag' : 'leave',
+            'max' : 30
+        },
+        'load' : {},
+        'unload' : {}
+    },
+    //附加数据配置
+    exdata : {
+        glo : ['remarks'],
+        tagname : {
+            'A' : ['href']
+        }
+    }
+});
 
 window.Digger();
