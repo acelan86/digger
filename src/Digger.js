@@ -21,88 +21,20 @@
  */
 //防止同一个页面引用多个Digger
 window.Digger = window.Digger || (function (win, doc) {
-    //默认配置项
-    var DEFAULT_CONFIG = {
-            //点击日志接受地址
-            url     : 'http://localhost/github/digger/log.data',
-            //缓冲区大小，可以被事件类型中的配置覆盖
-            max     : 1,
-            //全局监控标签，可以被事件类型中配置覆盖
-            tag     : 'mo',
-            //全局静态数据
-            info    : '',
-            //监控事件类型
-            type    : {
-                'click': {
-                    tag : 'click'
-                },
-                'load' : {
-                },
-                'unload' : {}
-                // 'move' : {
-                //     max: 50
-                // },
-                // 'enter' : {
-                //     max : 50
-                // },
-                // 'leave' : {
-                //     max : 50
-                // }
-            },
-            //附加数据配置
-            exdata : {
-                glo : ['remarks'],
-                tagname : {
-                    'A' : ['href']
-                }
-            }
-        },
-        //配置的事件类型对应的绑定事件类型
-        BIND_MAP = {
-            'click' : 'click',
-            'move'  : 'mousemove',
-            'enter' : 'mouseover',
-            'leave' : 'mouseout'
-        },
-        //记录tag + event_type是否全局绑定过，防止重复的绑定
-        isBind = {},
-        //保持当前创建的所有的log对象的列表
-        objs = {}, 
-
-        //记录
-        isReady = false,
-
-        E = encodeURIComponent,
-        ref = doc.referrer,
-        loc = win.location,
-        top = win.top.location.href;
-
-    //获取全局传递参数，通过url传入
-    var gloPar = (function () {
-        var s = loc.search,
-            i = 0,
-            kv,
-            r = [];
-        if (s) {
-            s = s.substring(1).split('&');
-            while (kv = s[i++]) {
-                if (kv.indexOf('_dg_') === 0) {
-                    r.push(kv.replace('_dg_', ''));
-                }
-            }
-        }
-        return r.join('&');
-    })();
-
-
-
-    //获取全局
-
-    /**
-     * 工具类
-     * @type {Object}
-     */
     var util = {
+        E : encodeURIComponent,
+        ref : doc.referrer,
+        loc : win.location,
+        top : (function () {
+            var top;
+            try {
+                top = win.top.location.href;
+            } catch (e) {
+                top = util.ref;
+            }
+            return top;
+        })(),
+        
         /**
          * 判断是否是ie浏览器，返回版本号
          */
@@ -121,26 +53,57 @@ window.Digger = window.Digger || (function (win, doc) {
             return Math.floor(min + Math.random() * (max - min + 1));
         },
         /**
-         * 简单扩展一个对象
-         * @param  {[type]} destination [description]
-         * @param  {[type]} source      [description]
-         * @return {[type]}             [description]
+         * 根据页面window.location.href生成唯一值
          */
-        extend: function (des, src) {
-            for (var k in src) {
-                des[k] = des[k] || src[k];
+        uid: function () {
+            var hash = 0,
+                i = 0,
+                w,
+                s = util.loc.href;
+
+            for(; !isNaN(w = s.charCodeAt(i++));) {
+                hash = ((hash << 5) - hash) + w;
+                hash = hash & hash;
+            }
+
+            return Math.abs(hash).toString(36);
+        },
+
+        /**
+         * 你懂的。
+         */
+        forEach: Array.prototype.forEach ? function (src, fn) {
+            src.forEach(fn);
+        } : function (src, fn) {
+            var i = 0,
+                item;
+            while (item = src[i++]) {
+                fn(item, i);
             }
         },
         /**
-         * 设置默认值，如果opt存在，使用opt的值
-         * @param {Object} o   源
-         * @param {Object} opt 附加参数对象
-         * @param {Object} def 默认参数对象
+         * 找到页面中tagname = tn, attributeName = an, attributeValue=av的节点集合
+         * @param  {String} tn 标签名，可以是*
+         * @param  {String} an 属性名
+         * @param  {String} av 属性值
+         * @return {Array}     符合条件的节点集合
          */
-        setDefault : function (o, opt, def) {
-            for (var k in def) {
-                o[k] = o[k] || opt[k] || def[k]; 
+        find : function (tn, an, av) {
+            var doms = Array.prototype.slice.call(document.getElementsByTagName(tn), 0),
+                r = [];
+            util.forEach(doms, function (dom, i) {
+                if (av ? util.getAttr(dom, an) === av : util.hasAttr(dom, an)) {
+                    r.push(dom);
+                }
+            });
+            return r.length > 0 ? r : null;
+        },
+
+        findParent: function (dom, an) {
+            while(dom.parentNode && dom !== doc.body && dom.hasAttribute && !util.hasAttr(dom, an)) {
+                dom = dom.parentNode;
             }
+            return dom;
         },
         /**
          * 事件代理
@@ -189,11 +152,8 @@ window.Digger = window.Digger || (function (win, doc) {
         },
         /**
          * dom ready方法
-         * @param  {[type]} doc [description]
-         * @param  {[type]} win [description]
-         * @return {[type]}     [description]
          */
-        ready : (function (doc, win) {
+        ready: (function (doc, win) {
             var isReady = 0,
                 isBind = 0,
                 fns = [],
@@ -280,8 +240,11 @@ window.Digger = window.Digger || (function (win, doc) {
          * @return {String}      属性值
          */
         getAttr : function (dom, name) {
-            return dom.getAttribute(name) || '';
+            return dom.getAttribute ? (dom.getAttribute(name) || '') : '';
         },
+        hasAttr : function (dom, name) {
+            return dom.hasAttribute ? dom.hasAttribute(name) : false;
+        },        
 
         /**
          * 序列化json对象的方法
@@ -294,6 +257,28 @@ window.Digger = window.Digger || (function (win, doc) {
                 str.push(key + '=' + json[key]);
             }
             return str.join('&');
+        },
+        /**
+         * 将a:b;c:d格式的数据转成对象
+         * @param  {[type]} str [description]
+         * @return {[type]}     [description]
+         */
+        strProp2jsonProp : function (str) {
+            var i = 0,
+                result = {},
+                prop;
+
+            if (!str) return null;
+
+            str = str.split(';');
+
+            while (prop = str[i++]) {
+                if (prop) {
+                    prop = prop.split(':');
+                    result[prop[0]] = prop[1];
+                }
+            }
+            return result;
         },
         /**
          * 获取鼠标位置
@@ -337,61 +322,95 @@ window.Digger = window.Digger || (function (win, doc) {
         }
     };
 
-
-    /**
-     * 交互数据记录对象
-     * @params  {Object}    opt_options     配置参数，描述见DEFAULT_CONFIG
-     */
-    function Digger(opt_options) {
-        var options = opt_options || {},
-            thiz;
-
-        //记录前缀，标识一个唯一记录集合
-        this.tag = options.tag || DEFAULT_CONFIG.tag;
-
-        thiz = objs[this.tag] || this;
-
-        //如果已经初始化了一个同名的digger实例，那么直接返回这个对象，没有添加name的new返回默认生成的对象
-        if (!objs[this.tag]) {
-
-            //把生成的对象记录到全局管理中
-            objs[this.tag] = this;
-
-            //缓存数组，不该被改变
-            this._tracks = {};
-
-            util.setDefault(this, opt_options || {}, DEFAULT_CONFIG);
-
-            //在页面卸载前把没有发出的数据发出
-            util.on(win, 'beforeunload', function () {
-                for (var key in thiz._tracks) {
-                    thiz.send(key, 0);
+    var DEFAULT_CONFIG = {
+            //点击日志接受地址
+            url: [
+                'http://localhost/github/digger/log1.data',
+                'http://localhost/github/digger/log2.data',
+                'http://localhost/github/digger/log3.data'
+            ],
+            //缓冲区大小，可以被事件类型中的配置覆盖
+            max: 1,
+            //全局监控标签，可以被事件类型中配置覆盖
+            tag: 'mo',
+            //监控事件类型
+            type: {
+                'click': {
+                    'tag': 'clk'
+                },
+                'enter' : {
+                    'tag': 'enter',
+                    'max': 10
+                },
+                'leave' : {
+                    'tag' : 'leave',
+                    'max' : 30
+                },
+                'load' : {},
+                'unload' : {}
+            },
+            //附加数据配置
+            exdata : {
+                glo : ['remarks'],
+                tagname : {
+                    'A' : ['href']
                 }
-            });
+            }
+        },
+        //配置的事件类型对应的绑定事件类型
+        BIND_MAP = {
+            'click' : 'click',
+            'move'  : 'mousemove',
+            'enter' : 'mouseover',
+            'leave' : 'mouseout'
+        };
+
+    //获取全局传递参数，通过url传入以_dg_开头
+    var gloPar = (function () {
+        var s = util.loc.search,
+            i = 0,
+            kv,
+            r = [];
+        if (s) {
+            s = s.substring(1).split('&');
+            while (kv = s[i++]) {
+                if (kv.indexOf('_dg_') === 0) {
+                    r.push(kv.replace('_dg_', ''));
+                }
+            }
         }
+        return r.join('&');
+    })();
 
-        //根据事件配置初始化监控行为并完成该次的onload和unload处理
-        util.ready(function () {
-            thiz.initMo(
-                options.tag  || DEFAULT_CONFIG.tag,
-                options.max  || DEFAULT_CONFIG.max,
-                options.type || DEFAULT_CONFIG.type
-            );
-        });
+    var digger;
 
-        return thiz;
+    
+
+
+    function Digger(options) {
+        this._tracks = {};
+
+        this._inited = {};
+
+        this.uid = util.uid();
+
+        this.url = options.url;
+        this.max = options.max;
+        this.type = options.type;
+        this.exdata = options.exdata;
+
+        this.init();
     }
 
+
+
     Digger.prototype = {
-        /**
-         * 初始化方法，根据this.type的配置声明绑定相应的记录事件
-         * @return
-         */
-        initMo : function (tag, max, types) {
-            var type,
-                thiz = this,
-                loadMsg, unloadMsg,//加载或者卸载时的附加数据
-                start = +new Date(); //记录进入页面时间
+        init : function () {
+            var thiz = this,
+                start = +new Date(),
+                types = this.type,
+                max = this.max,
+                tag = this.tag;
 
             for (var key in types) {
                 type = types[key] || {};
@@ -402,54 +421,59 @@ window.Digger = window.Digger || (function (win, doc) {
                 //绑定,这里会排除onload跟unload两个事件类型，后面特殊处理
                 //且如果全局未绑定tag + event_type
                 //这里如果绑定过max重新指定不起作用
-                if (BIND_MAP[key] && !isBind[tag + '|' + key]) {
+                if (BIND_MAP[key]) {
                     //设置每个事件类型的监控标识符tag和最大缓冲数量
                     //如果类型中没有配置，则使用全局配置
                     //全局配置默认使用DEFAULT_CONFIG的值
-                    util.setDefault(type, type, {
-                        tag : tag,
-                        max : max,
-                        type : key
-                    });
+                    type.tag = type.tag || tag;
+                    type.max = type.max || max;
+                    type.type = type.type || key;
 
-                    util.delegate(win, BIND_MAP[key], this._getCallbackHandler(type), type.tag);
-                    
-                    //标记tag + key这种类型已经被绑定过了
-                    isBind[tag + '|' + key] = 1;
+                    util.delegate(doc.body, BIND_MAP[key], this._getCallbackHandler(type), type.tag);
                 }
             }
 
-            //处理onload事件
+            //在页面卸载前把没有发出的数据发出
+            util.on(win, 'beforeunload', function () {
+                for (var key in thiz._tracks) {
+                    thiz.send(key, 0);
+                }
+
+                if (types.unload) {
+                    for (var id in thiz._inited) {
+                        var end = +new Date();
+                        thiz.log(thiz.format({
+                            _dur    : end - start,
+                            _ev     : 'unload',
+                            _t      : end,
+                            _bid    : id
+                        }));
+                    }
+                }
+            });
+        },
+        register : function (id) {
+            var thiz = this,
+                types = this.type,
+                id = id || this.uid;
+
             if (types.load) {
-                util.setDefault(types.load, types.load, {
-                    tag : tag
-                });
-                loadMsg = Digger.strProp2jsonProp(types.load.msg || util.getAttr(doc.body, types.load.tag)) || {};
-                loadMsg['_ev'] = 'load';
-                loadMsg['_t'] = (+new Date());
-                this.log(this.format(loadMsg));
+                if (!this._inited[id]) {
+                    this.log(this.format({
+                        _et : 'load',
+                        _t : +new Date(),
+                        _bid : id
+                    }));
+                }
             }
 
-            if (types.unload) {
-                util.setDefault(types.unload, types.unload, {
-                    tag : tag
-                });
-                unloadMsg = Digger.strProp2jsonProp(types.unload.msg || util.getAttr(doc.body, types.unload.tag)) || {};
-                util.on(window, 'beforeunload', function () {
-                    var end = (+new Date());
-                    unloadMsg['_dur'] = end - start;
-                    unloadMsg['_ev'] = 'unload';
-                    unloadMsg['_t'] = end;
-                    thiz.log(thiz.format(unloadMsg));
-                });
-            }
+            this._inited[id] = 1;
         },
         /**
          * 将obj转成string的方法, 可被重载，用于生成满足需求格式的数据内容
          * @params  {Object}    data    json形式的数据对象
          */
         format : util.serialize,
-
         /**
          * 获取发送日志的url, 如果时数组的话，选取随机的某个url进行发送
          * 防止对某一个url的请求过大
@@ -466,28 +490,33 @@ window.Digger = window.Digger || (function (win, doc) {
             }
         },
 
-        getMsg : function (type, target, pos, tag) {
+        getMsg : function (type, target, pos, tag, uid) {
             var i = 0,
                 k,
                 v,
                 thiz = this,
                 msg = {
-                    '_id' : target.id || 'noid' + (+new Date()),
-                    '_tagn' : target.tagName || 'notagname',
-                    '_x' : pos.x,
-                    '_y' : pos.y,
-                    '_t' : +new Date(),
-                    '_ev' : type
+                    '_id' : target.id || 'noid' + util.rnd(), //触发目标id
+                    '_tagn' : target.tagName || 'notagname',   //触发目标的tagName
+                    '_x' : pos.x,                              //触发x坐标
+                    '_y' : pos.y,                              //触发y坐标
+                    '_t' : +new Date(),                        //触发时间
+                    '_ev' : type,                              //事件类型
+                    '_bid' : uid || this.uid                   //触发的块区域id,如果没有即body区域，本面的uid
                 };
-            //获取mo-tag上的携带数据，如果与默认提交数据重名, 则覆盖
+            //获取tag上的携带数据，
+            //即<div mo="a:1;b:2"></div>
+            //如果与默认提交数据重名, 则覆盖
             (function (msg, target, tag) {
-                var exmsg = Digger.strProp2jsonProp(util.getAttr(target, tag));
+                var exmsg = util.strProp2jsonProp(util.getAttr(target, tag));
                 for (var k in exmsg) {
-                    msg[k] = E(exmsg[k]);
+                    msg[k] = util.E(exmsg[k]);
                 }
             })(msg, target, tag);
 
             //获取额外数据, 如果存在，覆盖
+            //即glo中指出的标签，例如remarks,
+            //<div mo remarks="xxx"></div>
             (function (exdata, msg, target) {
                 var i = 0,
                     list = exdata.glo || [],
@@ -499,7 +528,7 @@ window.Digger = window.Digger || (function (win, doc) {
                     list = list.concat(tn[target.tagName.toUpperCase()]);
                 }
                 while (k = list[i++]) {
-                    (v = util.getAttr(target, k)) && (msg[k] = E(v));
+                    (v = util.getAttr(target, k)) && (msg[k] = util.E(v));
                 }
             })(this.exdata || {}, msg, target);
 
@@ -512,7 +541,7 @@ window.Digger = window.Digger || (function (win, doc) {
          */
         log : function (msg) {
             var img = new Image(1, 1),
-                key = this.tag + '_' + util.rnd(),
+                key = this.uid + '_' + util.rnd(),
                 info,
                 url = this.getUrl();
 
@@ -523,18 +552,14 @@ window.Digger = window.Digger || (function (win, doc) {
                 img = null;
             };
 
-            /* 获取全局info */
-            info = (function (info) {
-                var r = [];
-                if (info) {
-                    for (var k in info) {
-                        r.push(k + '=' + info[k]);
-                    }
-                }
-                return r.join('&');
-            })(this.info);
-
-            img.src = url + '?log=' + this.tag + (info ? '&' + info : '') + '&ref=' + E(ref) + '&top=' + E(top) + (gloPar ? '&' + gloPar : '') + '&t=' + (+new Date()) + '&msg=' + E(msg);
+            img.src = url
+                + '?log=' + this.uid
+                + (info ? '&' + info : '')
+                + '&ref=' + util.E(util.ref)
+                + '&top=' + util.E(top)
+                + (gloPar ? '&' + gloPar : '')
+                + '&t=' + (+new Date())
+                + '&msg=' + util.E(msg);
         },
 
         /**
@@ -546,88 +571,45 @@ window.Digger = window.Digger || (function (win, doc) {
             var msgs = [],
                 msg = '',
                 tracks = this._tracks[type];
+
             if (!max) {
                 while (msg = tracks.shift()) {
                     msgs.push(msg);
                 }
-                msgs.length >= 0 && this.log(msgs.join('|'));
+                msgs.length > 0 && this.log(msgs.join('|'));
             } else if (tracks.length >= max) {
                 while (((max--) > 0) && (msg = tracks.shift())) {
                     msgs.push(msg);
                 }
-                msgs.length >= 0 && this.log(msgs.join('|'));
+                msgs.length > 0 && this.log(msgs.join('|'));
             }
         },
-
-        /**
-         * =======================
-         * 以下为各个事件类型绑定回调方法
-         * @param {Object}  obj  [description]
-        */
         _getCallbackHandler : function (obj) {
             var thiz = this,
                 type = obj.type,
                 max = obj.max,
                 tag = obj.tag;
-
             return function (e) {
+                var area = util.findParent(e.delegateTarget, 'digger');
+                area = util.getAttr(area, 'digger');
                 var pos = util.getPos(e);
-                thiz._tracks[type].push(thiz.format(thiz.getMsg(type, e.delegateTarget, pos, tag)));
-                thiz.send(type, max);
-            }
+                thiz._tracks[type].push(thiz.format(thiz.getMsg(type, e.delegateTarget, pos, tag, area)));
+                thiz.send(type, max)
+            };
         }
     };
 
-    /**
-     * 从当前已经生成的log对象中取出名字为tag的对象
-     */
-    Digger.getObjs = function (tag) {
-        return objs.tag;
-    };
-
-    /**
-     * 将a:b;c:d格式的数据转成对象
-     * @param  {[type]} str [description]
-     * @return {[type]}     [description]
-     */
-    Digger.strProp2jsonProp = function (str) {
-        var i = 0,
-            result = {},
-            prop;
-
-        if (!str) return null;
-
-        str = str.split(';');
-
-        while (prop = str[i++]) {
-            if (prop) {
-                prop = prop.split(':');
-                result[prop[0]] = prop[1];
-            }
-        }
-        return result;
-    };
-
-    /**
-     * 初始化digger对象，根据script的标识
-     * 但what a fuck !!! 每次都要这么做真心影响效率, 当script多的时候
-    */
-    (function () {
+    return function () {
         util.ready(function () {
-            var scripts = Array.prototype.slice.call(document.getElementsByTagName('script'),0),
-                i = 0,
-                script,
-                options = {};
-            while (script = scripts[i++]) {
-                if (script.hasAttribute('digger-tag')) {
-                    options['tag'] = util.getAttr(script, 'digger-tag');
-                    options['info'] = Digger.strProp2jsonProp(util.getAttr(script, 'digger-msg')); //全局数据
-                    new Digger(options);
+            util.forEach(
+                util.find('script', 'digger'), 
+                function (script, i) {
+                    !digger && (digger = new Digger(DEFAULT_CONFIG));
+                    digger.register(util.getAttr(script, 'digger'));
                 }
-            }
+            );
         });
-    })();
-
-    return Digger;
-
+    };
 })(window, document);
+
+window.Digger();

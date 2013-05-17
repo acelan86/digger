@@ -20,11 +20,13 @@
     <body>
         <!-- head中引入监控的广告-->
         <div digger="pdps22222_12323434_1">
-            <span mo>scriptinhead</span>
+            <span clk="aaa:1" remarks="xxxx">scriptinhead</span>
+            <span enter>enter</span>
+            <a href="http://aaa.com" clk target="_blank">a link</a>
         </div>
         <!-- 同步方式document.write引入广告-->
         <script>
-            document.write('<div id="xx" mo>sync ad</div>');
+            document.write('<div id="xx" mo>sync ad<span leave enter>enter&leave</span></div>');
             document.write('<script src="src/new.js" digger="pdps22222_12323434_1">' + '<' + '/script>');
         </script>
 
