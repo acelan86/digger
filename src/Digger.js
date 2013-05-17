@@ -22,7 +22,7 @@
 //防止同一个页面引用多个Digger
 window.Digger = window.Digger || (function (win, doc) {
     var util = {
-        E : encodeURIComponent,
+        E : win.encodeURIComponent,
         ref : doc.referrer,
         loc : win.location,
         top : (function () {
@@ -49,13 +49,13 @@ window.Digger = window.Digger || (function (win, doc) {
         /**
          * 生成min-max的随机整数,包括min和max
          */
-        rand: function (min, max) {
+        rand : function (min, max) {
             return Math.floor(min + Math.random() * (max - min + 1));
         },
         /**
          * 根据页面window.location.href生成唯一值
          */
-        uid: function () {
+        uid : function () {
             var hash = 0,
                 i = 0,
                 w,
@@ -72,7 +72,7 @@ window.Digger = window.Digger || (function (win, doc) {
         /**
          * 你懂的。
          */
-        forEach: Array.prototype.forEach ? function (src, fn) {
+        forEach : Array.prototype.forEach ? function (src, fn) {
             src.forEach(fn);
         } : function (src, fn) {
             var i = 0,

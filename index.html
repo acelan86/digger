@@ -15,7 +15,7 @@
                 margin:10px;
             }
         </style>
-        <script src="src/new.js" digger="pdps:44444444"></script>
+        <script src="src/Digger.js" digger="pdps:44444444"></script>
     <head>
     <body>
         <!-- head中引入监控的广告-->
@@ -27,12 +27,12 @@
         <!-- 同步方式document.write引入广告-->
         <script>
             document.write('<div id="xx" mo>sync ad<span leave enter>enter&leave</span></div>');
-            document.write('<script src="src/new.js" digger="pdps22222_12323434_1">' + '<' + '/script>');
+            document.write('<script src="src/Digger.js" digger="pdps22222_12323434_1">' + '<' + '/script>');
         </script>
 
         <!-- body中的广告 -->
         <div mo>scriptinbody</div>
-        <script src="src/new.js" digger="pdps:pdps0000000"></script>
+        <script src="src/Digger.js" digger="pdps:pdps0000000"></script>
 
         <script>
             //异步加载方式引入广告
@@ -42,7 +42,7 @@
             document.body.insertBefore(div, document.body.firstChild);
 
             var script = document.createElement('script');
-            script.src = 'src/new.js';
+            script.src = 'src/Digger.js';
             script.setAttribute('digger', 'pdps:pdps1111111');
             document.body.insertBefore(script, document.body.firstChild);
         </script>
