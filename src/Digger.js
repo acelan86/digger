@@ -35,6 +35,24 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
             }
             return top;
         })(),
+        cookie : {
+            getRaw : function (key) {
+                var reg = new RegExp("(^| )" + key + "=([^;]*)(;|\x24)"),
+                    result = reg.exec(document.cookie);
+                     
+                if (result) {
+                    return result[2] || null;
+                }
+            },
+            get : function (key) {
+                var value = util.cookie.getRaw(key);
+                if ('string' == typeof value) {
+                    value = decodeURIComponent(value);
+                    return value;
+                }
+                return null;
+            }
+        },
         
         /**
          * 判断是否是ie浏览器，返回版本号
@@ -363,7 +381,13 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
         this.url = options.url;
         this.max = options.max;
         this.type = options.type;
+
         this.exdata = options.exdata;
+
+        if (options.cookie instanceof Array) {
+            //获取cookie配置项中的参数指定的cookie值
+            this.initCookie(options.cookie);
+        }
 
         this.init();
     }
@@ -417,6 +441,17 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
                     }
                 }
             });
+        },
+
+        initCookie : function (keys) {
+            var result = [];
+            util.forEach(keys, function (key, i) {
+                var value = util.cookie.get(key);
+                if (value) {
+                    result.push(key + '=' + value);
+                }
+            });
+            this._ck = result.join(';');
         },
         register : function (id) {
             var thiz = this,
@@ -525,6 +560,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
                 + '&top=' + util.E(util.top)
                 + (gloPar ? '&' + gloPar : '')
                 + '&t=' + (+new Date())
+                + (this._ck ? '&ck=' + util.E(this._ck) : '')
                 + '&msg=' + util.E(msg);
         },
 
@@ -604,6 +640,8 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
         'load' : {},
         'unload' : {}
     },
+    //取cookie中的key
+    cookie : ["CoupletMedia903999100"],
     //附加数据配置
     exdata : {
         glo : ['remarks'],
