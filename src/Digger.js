@@ -94,7 +94,6 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
         forEach : Array.prototype.forEach ? function (src, fn) {
             src.forEach(fn);
         } : function (src, fn) {
-            if (!src) return;
             var i = 0,
                 item;
             while (item = src[i++]) {
@@ -264,11 +263,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
             return dom.getAttribute ? (dom.getAttribute(name) || '') : '';
         },
         hasAttr : function (dom, name) {
-            return dom.hasAttribute ? 
-                        dom.hasAttribute(name) 
-                        : document.getAttribute ?
-                            dom.getAttribute(name) !== null
-                            : false;
+            return document.getAttribute ? dom.getAttribute(name) !== null : false;
         },        
 
         /**
@@ -609,8 +604,9 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
 
     return function () {
         util.ready(function () {
-            util.forEach(
-                util.find('script', 'digger'), 
+            var scripts = util.find('script', 'digger');
+            scripts && util.forEach(
+                scripts,
                 function (script, i) {
                     !digger && (digger = new Digger(DEFAULT_CONFIG));
                     //注册曝光事件
