@@ -108,7 +108,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
          * @return {Array}     符合条件的节点集合
          */
         find : function (tn, an, av) {
-            var doms = Array.prototype.slice.call(document.getElementsByTagName(tn), 0),
+            var doms = Array.prototype.slice.call(document.getElementsByTagName(tn) || [], 0),
                 r = [];
             util.forEach(doms, function (dom, i) {
                 if (av ? util.getAttr(dom, an) === av : util.hasAttr(dom, an)) {
