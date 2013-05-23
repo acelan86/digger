@@ -264,7 +264,11 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
             return dom.getAttribute ? (dom.getAttribute(name) || '') : '';
         },
         hasAttr : function (dom, name) {
-            return dom.hasAttribute ? dom.hasAttribute(name) : dom.getAttribute(name) !== null;
+            return dom.hasAttribute ? 
+                        dom.hasAttribute(name) 
+                        : document.getAttribute ?
+                            dom.getAttribute(name) !== null
+                            : false;
         },        
 
         /**
