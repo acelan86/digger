@@ -120,7 +120,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
         },
 
         findParent: function (dom, an) {
-            while(dom.parentNode && dom !== doc.body && dom.hasAttribute && !util.hasAttr(dom, an)) {
+            while(dom.parentNode && dom !== doc.body && !util.hasAttr(dom, an)) {
                 dom = dom.parentNode;
             }
             return dom;
@@ -139,7 +139,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
                 var target = e.target;
                 if (tag) {
                     while (target !== this.parentNode && target !== doc.body) {
-                        if (target.hasAttribute(tag)) {
+                        if (util.hasAttr(target,tag)) {
                             e.delegateTarget = target;
                             callback.call(this, e);
                         }
