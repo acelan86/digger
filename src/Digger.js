@@ -94,6 +94,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
         forEach : Array.prototype.forEach ? function (src, fn) {
             src.forEach(fn);
         } : function (src, fn) {
+            if (!src) return;
             var i = 0,
                 item;
             while (item = src[i++]) {
@@ -211,6 +212,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
 
             // Process items when the DOM is ready.
             function init() {
+                if (isReady) return;
                 isReady = 1;
 
                 // Make sure body exists, at least, in case IE gets a little overzealous.
@@ -262,7 +264,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
             return dom.getAttribute ? (dom.getAttribute(name) || '') : '';
         },
         hasAttr : function (dom, name) {
-            return dom.hasAttribute ? dom.hasAttribute(name) : false;
+            return dom.hasAttribute ? dom.hasAttribute(name) : dom.getAttribute(name) !== null;
         },        
 
         /**
