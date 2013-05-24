@@ -15,7 +15,7 @@
                 margin:10px;
             }
         </style>
-        <script src="src/Digger.js"></script>
+        <script src="src/Digger.js" digger="pdps:44444444"></script>
     <head>
     <body>
         <!-- head中引入监控的广告-->
@@ -33,18 +33,5 @@
         <!-- body中的广告 -->
         <div mo>scriptinbody</div>
         <script src="src/Digger.js" digger="pdps:pdps0000000"></script>
-
-        <script>
-            //异步加载方式引入广告
-            var div = document.createElement('div');
-            div.setAttribute('mo', '');
-            div.innerHTML = 'async ad';
-            document.body.insertBefore(div, document.body.firstChild);
-
-            var script = document.createElement('script');
-            script.src = 'src/Digger.js';
-            script.setAttribute('digger', 'pdps:pdps1111111');
-            document.body.insertBefore(script, document.body.firstChild);
-        </script>
     </body>
 </html>

@@ -91,9 +91,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
         /**
          * 你懂的。
          */
-        forEach : Array.prototype.forEach ? function (src, fn) {
-            src.forEach(fn);
-        } : function (src, fn) {
+        forEach : function (src, fn) {
             var i = 0,
                 item;
             while (item = src[i++]) {
@@ -108,7 +106,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
          * @return {Array}     符合条件的节点集合
          */
         find : function (tn, an, av) {
-            var doms = Array.prototype.slice.call(document.getElementsByTagName(tn) || [], 0),
+            var doms = document.getElementsByTagName(tn) || [],
                 r = [];
             util.forEach(doms, function (dom, i) {
                 if (av ? util.getAttr(dom, an) === av : util.hasAttr(dom, an)) {
@@ -119,7 +117,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
         },
 
         findParent: function (dom, an) {
-            while(dom.parentNode && dom !== doc.body && !util.hasAttr(dom, an)) {
+            while(dom && dom !== doc.body && !util.hasAttr(dom, an)) {
                 dom = dom.parentNode;
             }
             return dom;
@@ -135,10 +133,10 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
          */
         delegate : function (dom, type, callback, tag) {
             util.on(dom, type, function (e) {
-                var target = e.target;
+                var target = e.delegateTarget;
                 if (tag) {
-                    while (target !== this.parentNode && target !== doc.body) {
-                        if (util.hasAttr(target,tag)) {
+                    while (target && target !== doc.body) {
+                        if (util.hasAttr(target, tag)) {
                             e.delegateTarget = target;
                             callback.call(this, e);
                         }
@@ -263,7 +261,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
             return dom.getAttribute ? (dom.getAttribute(name) || '') : '';
         },
         hasAttr : function (dom, name) {
-            return document.getAttribute ? dom.getAttribute(name) !== null : false;
+            return dom.getAttribute ? dom.getAttribute(name) !== null : false;
         },        
 
         /**
@@ -553,7 +551,6 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
                 window[key] = null;
                 img = null;
             };
-
             img.src = url
                 + '?log=' + this.uid
                 + '&ifr=' + util.ifr
@@ -563,6 +560,7 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
                 + '&t=' + (+new Date())
                 + (this._ck ? '&ck=' + util.E(this._ck) : '')
                 + '&msg=' + util.E(msg);
+
         },
 
         /**
@@ -574,14 +572,13 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
             var msgs = [],
                 msg = '',
                 tracks = this._tracks[type];
-
             if (!max) {
                 while (msg = tracks.shift()) {
                     msgs.push(msg);
                 }
                 msgs.length > 0 && this.log(msgs.join('|'));
             } else if (tracks.length >= max) {
-                while (((max--) > 0) && (msg = tracks.shift())) {
+                while (max-- > 0 && (msg = tracks.shift())) {
                     msgs.push(msg);
                 }
                 msgs.length > 0 && this.log(msgs.join('|'));
@@ -618,9 +615,9 @@ window.Digger = window.Digger || (function (win, doc, DEFAULT_CONFIG) {
 })(window, document, {
     //点击日志接受地址
     url: [
-        'http://localhost/github/digger/log1.data',
-        'http://localhost/github/digger/log2.data',
-        'http://localhost/github/digger/log3.data'
+        'http://test.com/github/digger/log1.data',
+        'http://test.com/github/digger/log2.data',
+        'http://test.com/github/digger/log3.data'
     ],
     //缓冲区大小，可以被事件类型中的配置覆盖
     max: 1,
