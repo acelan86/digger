@@ -15,7 +15,7 @@
                 margin:10px;
             }
         </style>
-        <script src="./src/Tracker.js"></script>
+        <script src="./src/Tracker2.js"></script>
     <head>
     <body>
         <div enter sadt="pdps:pdps12345678;cont:121213232">
@@ -23,15 +23,15 @@
             <input type="button" value="button" />
         </div>
         <script>
-            Tracker.monitor('pdps:pdps12345678;cont:121213232');
+            Tracker('pdps:pdps12345678;cont:121213232');
         </script>
 
-        <div sadt="pdps8888888">
+        <div leave sadt="pdps8888888">
             <a herf="http://baidu.com">click url</a>
             <input clk type="button" value="button" />
         </div>
         <script>
-            Tracker.monitor('pdps8888888');
+            Tracker('pdps8888888');
         </script>
     </body>
 </html>
