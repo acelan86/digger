@@ -1,6 +1,4 @@
-var Tracker = (function (win, doc, glo_conf) {
-    var conf = conf || {};
-
+var Tracker = (function (win, doc, conf) {
     var util = {
         E : win.encodeURIComponent,
         ref : doc.referrer,
@@ -15,6 +13,11 @@ var Tracker = (function (win, doc, glo_conf) {
             }
             return top;
         })(),
+        extend : function (des, ext) {
+            for (var key in ext) {
+                des[key] = ext[key];
+            }
+        },
         cookie : {
             getRaw : function (key) {
                 var reg = new RegExp("(^| )" + key + "=([^;]*)(;|\x24)"),
@@ -35,7 +38,7 @@ var Tracker = (function (win, doc, glo_conf) {
         },
         ie : /msie (\d+\.\d)/i.test(navigator.userAgent),
 
-                /**
+        /**
          * 随机数生成，生成一个随机数的36进制表示方法
          */
         rnd : function () {
@@ -152,6 +155,15 @@ var Tracker = (function (win, doc, glo_conf) {
                 }
             }
         },
+        inArray : function (arr, item) {
+            var r = false;
+            for (var len = arr.length - 1; len >=0; len--) {
+                if (arr[len] === item) {
+                    r = true;
+                }
+            }
+            return r;
+        },
         delegate : function (dom, type, callback, filter) {
             util.on(dom, type, function (e) {
                 var target = e.realTarget;
@@ -181,36 +193,57 @@ var Tracker = (function (win, doc, glo_conf) {
                e.relTarget = e.relatedTarget || e.toElement || e.fromElement || null;
                callback.call(dom, e);
             };
+
             //@todo 为ie添加兼容
             if (dom.addEventListener) {
                 dom.addEventListener(type, handler, false);
             } else if (dom.attachEvent) {
                 dom.attachEvent('on' + type, handler);
             }
-        },
+        }
     };
 
-    function Tracker(opt_options) {
-        var options = opt_options || {};
 
-        this.types = options.types || Tracker.DEFAULT.types;
 
-        //监控标记
-        this.tag = options.tag || Tracker.DEFAULT.tag;
 
-        this.list = {};
 
-        this._tracks = {};
 
-        this.url = options.url || Tracker.DEFAULT.url;
+    
+    function Tracker(options) {
+        //监控标记的名称，用来配置一块监控区域
+        this.tag = options.tag || 'sadt';
+
+        //监控事件类型
+        this.types = options.types || ['click', 'enter', 'leave', 'load', 'unload'];
+
+        this.url = options.url;
+
+        this.exdata = options.exdata;
+
+        this._initData(options);
+
+        //挂接页面卸载前的处理事件
+        util.on(win, 'beforeunload', this._getUnloadHandle());
 
     };
 
     Tracker.EVENT_MAP = {
-        'click' : 'click',
-        'move'  : 'mousemove',
-        'enter' : 'mouseover',
-        'leave' : 'mouseout'
+        'click' : {
+            bind : 'click',
+            max : 1
+        },
+        'move'  : {
+            bind : 'mousemove',
+            max : 5
+        },
+        'enter' : {
+            bind : 'mouseover',
+            max : 5
+        },
+        'leave' : {
+            bind : 'mouseout',
+            max : 5
+        }
     };
 
     //获取全局传递参数，通过url传入以_dg_开头
@@ -230,39 +263,112 @@ var Tracker = (function (win, doc, glo_conf) {
         return r.join('&');
     })();
 
+    Tracker._getCookieInfo = function (keys) {
+        var r = [];
+        util.forEach(keys, function (key, i) {
+            var value = util.cookie.get(key);
+            if (value) {
+                r.push(key + '=' + value);
+            }
+        });
+        return r.join(';');
+    };
+
     Tracker.uid = util.uid();
 
-    Tracker.DEFAULT = glo_conf;
-
     Tracker.prototype = {
-        monitor : function (name, types, subOptions) {
-            var tag = this.tag,
-                types = types || this.types,
-                thiz = this,
-                subOptions = subOptions || {};
-            util.forEach(types, function (type, i) {
-                if (!thiz._tracks[type]) {
-                    thiz._tracks[type] = [];
+        _initData : function (options) {
+            var max, filter;
+
+            //监控位置和相应配置映射表初始化，不应该被从外部改动
+            this._list = {};
+
+            this._cache = {};
+
+
+            for (var type in Tracker.EVENT_MAP) {
+                this._cache[type] = [];
+
+                this._list['_default_event_' + type] = {
+                    max : options[type] ? (options[type].max || Tracker.EVENT_MAP[type].max) : Tracker.EVENT_MAP[type].max,
+                    filter : options[type] ? (options[type].filter || Tracker.EVENT_MAP[type].filter) : Tracker.EVENT_MAP[type].filter
+                };
+            }
+
+            //初始化cookie
+            this._ck = Tracker._getCookieInfo(options.cookie || []);
+        },
+        _getUnloadHandle : function () {
+            var thiz = this;
+            return function () {
+                var now = +new Date();
+
+                //页面卸载时立刻发送缓冲区所有数据
+                for (var type in thiz._cache) {
+                    thiz.send(type, 0);
                 }
+            }
+        },
+
+        monitor : function (name, types, options) {
+            var thiz = this,
+                types = types || this.types,
+                options = options || {},
+                now = +new Date();
+
+            //注册每个监控区域的事件代理
+            util.forEach(types, function (type, i) {
+
+                if (type === 'load') {
+                    thiz._list[name + 'load'] = now;
+                    thiz.log(thiz.format({
+                        _ev : 'load',
+                        _t : now,
+                        _bid : name
+                    }));
+                }
+
+                if (type === 'unload') {
+                    util.on(win, 'beforeunload', function () {
+                        //发送卸载日志，停留时间
+                        thiz.log(thiz.format({
+                            _dur    : now - thiz._list[name + 'load'],
+                            _ev     : 'unload',
+                            _t      : now,
+                            _bid    : name
+                        }));
+                    });
+                }
+
                 if (Tracker.EVENT_MAP[type]) {
-                    util.delegate(
-                        win,
-                        Tracker.EVENT_MAP[type],
-                        thiz._getHandler(type),
-                        function (dom) {
-                            return util.attr(dom, tag) === name;
-                        }
-                    );
-                    if (!thiz.list[name]) {
-                        thiz.list[name] = {};
-                    }
-                    thiz.list[name][type] = subOptions[type] || Tracker.DEFAULT[type];
+                    thiz._list[name + type] = {
+                        max : options[type] ? (options[type].max || thiz._list['_default_event_' + type].max) : thiz._list['_default_event_' + type].max,
+                        filter : options[type] ? (options[type].filter || thiz._list['_default_event_' + type].filter) : thiz._list['_default_event_' + type].filter
+                    };
+                    //注册name区域的type监控事件
+                    thiz._monitor(name, type);
                 }
             });
         },
 
-        getEventObj : function (name, type) {
-            return this.list[name] ? this.list[name][type] : undefined;
+
+        /**
+         * 注册监控区域交互事件
+         * @param  {[type]} type [description]
+         * @return {[type]}      [description]
+         */
+        _monitor : function (name, type) {
+            var thiz = this,
+                tag = this.tag;
+
+            util.delegate(
+                doc,
+                Tracker.EVENT_MAP[type].bind,
+                thiz._getMonitorHandler(name, type),
+                function (dom) {
+                    return util.attr(dom, tag) === name;
+                }
+            );
         },
 
         findTarget : function (from, to, filter) {
@@ -278,27 +384,25 @@ var Tracker = (function (win, doc, glo_conf) {
             }
             return null;
         },
-
-        findMonitor : function (name) {
-            //获取this.tag属性为name的节点
-        },
-        _getHandler : function (type) {
+        _getMonitorHandler : function (name, type) {
             var thiz = this,
-                tag = this.tag;
+                conf = this._list[name + type];
             return function (e) {
-                var name = util.attr(e.delegateTarget, tag),
-                    conf = thiz.getEventObj(name, type),
-                    monitorTarget;
-                if (conf) {
-                    monitorTarget = thiz.findTarget(e.realTarget, e.delegateTarget, conf.filter);
-                    if (monitorTarget) {
-                        var pos = util.getPos(e);
-                        thiz._tracks[type].push(thiz.format(thiz.getMsg(type, monitorTarget, pos, tag, name)));
-                        thiz.send(type, conf.max)
-                    }
+                //如果没有filter, 则取当前触发的元素位监控元素
+                var monitorTarget = conf.filter ? 
+                        thiz.findTarget(e.realTarget, e.delegateTarget, conf.filter) :
+                        e.realTarget;
+
+                if (monitorTarget) {
+                    var pos = util.getPos(e);
+                    thiz._cache[type].push(thiz.format(thiz.getMsg(type, monitorTarget, pos, name)));
+                    thiz.send(type, conf.max)
                 }
             };
         },
+
+
+
         /**
          * 将obj转成string的方法, 可被重载，用于生成满足需求格式的数据内容
          * @params  {Object}    data    json形式的数据对象
@@ -310,17 +414,18 @@ var Tracker = (function (win, doc, glo_conf) {
          *
          */
         getUrl: function () {
-            var len;
-            if ((this.url instanceof Array) && (len = this.url.length)) {
-                return this.url[util.rand(0, len - 1)];
-            } else if ('string' === typeof this.url) {
-                return this.url;
+            var len,
+                url = this.url;
+            if ((url instanceof Array) && (len = url.length)) {
+                return url[util.rand(0, len - 1)];
+            } else if ('string' === typeof url) {
+                return url;
             } else {
                 throw new Error("url must string or array, and array must not empty.");
             }
         },
 
-        getMsg : function (type, target, pos, tag, uid) {
+        getMsg : function (type, target, pos, uid) {
             var i = 0,
                 k,
                 v,
@@ -334,15 +439,6 @@ var Tracker = (function (win, doc, glo_conf) {
                     '_ev' : type,                              //事件类型
                     '_bid' : uid || Tracker.uid                   //触发的块区域id,如果没有即body区域，本面的uid
                 };
-            //获取tag上的携带数据，
-            //即<div mo="a:1;b:2"></div>
-            //如果与默认提交数据重名, 则覆盖
-            (function (msg, target, tag) {
-                var exmsg = util.strProp2jsonProp(util.attr(target, tag));
-                for (var k in exmsg) {
-                    msg[k] = util.E(exmsg[k]);
-                }
-            })(msg, target, tag);
 
             //获取额外数据, 如果存在，覆盖
             //即glo中指出的标签，例如remarks,
@@ -358,7 +454,7 @@ var Tracker = (function (win, doc, glo_conf) {
                     list = list.concat(tn[target.tagName.toUpperCase()]);
                 }
                 while (k = list[i++]) {
-                    (v = util.getAttr(target, k)) && (msg[k] = util.E(v));
+                    (v = util.attr(target, k)) && (msg[k] = util.E(v));
                 }
             })(this.exdata || {}, msg, target);
 
@@ -395,13 +491,13 @@ var Tracker = (function (win, doc, glo_conf) {
 
         /**
          * 判断是否达到最大缓冲数量，并发送，传入类型与最大数
-         * @param {String} type 从this._tracks中挑出type类型的数据
+         * @param {String} type 从this._cache中挑出type类型的数据
          * @param {Number} max  缓冲区最大数量，max为0表示立刻发送所有数据
          */
         send : function (type, max) {
             var msgs = [],
                 msg = '',
-                tracks = this._tracks[type];
+                tracks = this._cache[type];
             if (!max) {
                 while (msg = tracks.shift()) {
                     msgs.push(msg);
@@ -416,35 +512,38 @@ var Tracker = (function (win, doc, glo_conf) {
         }
     };
 
-    return new Tracker();
+    return new Tracker(conf);
+
 })(window, document, {
     //点击日志接受地址
     url: [
-        'http://localhost/github/digger/log1.data',
-        'http://localhost/github/digger/log2.data',
-        'http://localhost/github/digger/log3.data'
+        'http://localhost./github/digger/log1.data',
+        'http://localhost./github/digger/log2.data',
+        'http://localhost./github/digger/log3.data'
     ],
-    //全局监控标签，可以被事件类型中配置覆盖
-    tag: 'sadt',
-
-    types: ["click", "enter", "leave"],
-
+    exdata : {
+        glo : ["remarks"],
+        tagname : {
+            "A" : ["href"]
+        }
+    },
+    cookie: ["SINAGLOBAL"],
     click : {
+        max : 1,
         filter : function (dom) {
             return dom.getAttribute('clk') !== null;
-        },
-        max : 1
+        }
     },
     enter : {
+        max : 5,
         filter : function (dom) {
             return dom.getAttribute('enter') !== null;
-        },
-        max : 5
+        }
     },
     leave : {
+        max : 5,
         filter : function (dom) {
             return dom.getAttribute('leave') !== null;
-        },
-        max : 5
+        }
     }
 });

@@ -18,27 +18,20 @@
         <script src="./src/Tracker.js"></script>
     <head>
     <body>
-        <div enter leave sadt="pdps12345678">
-            <a clk herf="http://baidu.com">click url</a>
+        <div enter sadt="pdps:pdps12345678;cont:121213232">
+            <a clk target="_blank" href="http://baidu.com" remarks="abc:1;b:2">click url</a>
             <input type="button" value="button" />
         </div>
         <script>
-            Tracker.monitor('pdps12345678', ["click", "enter", "leave"]);
+            Tracker.monitor('pdps:pdps12345678;cont:121213232');
         </script>
 
-         <div sadt="pdps8888888">
+        <div sadt="pdps8888888">
             <a herf="http://baidu.com">click url</a>
             <input clk type="button" value="button" />
         </div>
         <script>
-            Tracker.monitor('pdps8888888', ['click', 'enter'], {
-                click : {
-                    max : 10,
-                    filter : function (dom) {
-                        return dom.tagName.toUpperCase() === 'INPUT';
-                    }
-                }
-            });
+            Tracker.monitor('pdps8888888');
         </script>
     </body>
 </html>
