@@ -315,15 +315,17 @@ var Tracker = (function (win, doc, DEFAULT_CONFIG) {
                     conf = THIS._events[type];
                     monitorTarget = conf.filter ? util.findTarget(e.realTarget, e.delegateTarget, conf.filter) : e.realTarget;
 
-                if (monitorTarget) {
-                    pos = util.getPos(e);
-                    msg = THIS.getMessage(type, monitorTarget, pos);
+                e.monitorType = type;
+                e.monitorTarget = monitorTarget;
+
+                if (e.monitorTarget) {
+                    msg = THIS.getMessage(e);
                     THIS._cache[type].push(THIS.format(msg));
                     THIS.send(type, conf.max)
                 }
             };
         },
-        //获取代理判断条件
+        //获取代理判断条件句柄
         _getFilter : function (name) {
             var THIS = this;
             return function (dom) {
@@ -352,10 +354,11 @@ var Tracker = (function (win, doc, DEFAULT_CONFIG) {
             }
         },
 
-        getMessage : function (type, target, pos) {
-            var i = 0,
-                k,
-                v,
+        getMessage : function (e) {
+            var target = e.monitorTarget,
+                type = e.monitorType,
+                pos = util.getPos(e),
+                exdata = this.exdata || {},
                 msg = {
                     '_id' : target.id || 'noid' + util.rnd(), //触发目标id
                     '_tagn' : target.tagName || 'notagname',   //触发目标的tagName
@@ -382,7 +385,7 @@ var Tracker = (function (win, doc, DEFAULT_CONFIG) {
                 while (k = list[i++]) {
                     (v = util.attr(target, k)) && (msg[k] = util.E(v));
                 }
-            })(this.exdata || {}, msg, target);
+            })(exdata, msg, target);
 
             return msg;
         },
@@ -428,13 +431,12 @@ var Tracker = (function (win, doc, DEFAULT_CONFIG) {
                 while (msg = tracks.shift()) {
                     msgs.push(msg);
                 }
-                msgs.length > 0 && this.log(msgs.join('|'));
             } else if (tracks.length >= max) {
                 while (max-- > 0 && (msg = tracks.shift())) {
                     msgs.push(msg);
                 }
-                msgs.length > 0 && this.log(msgs.join('|'));
             }
+            msgs.length > 0 && this.log(msgs.join('|'));
         }
     };
 
@@ -450,8 +452,6 @@ var Tracker = (function (win, doc, DEFAULT_CONFIG) {
     };
 
     Tracker.DEFAULT_CONFIG = DEFAULT_CONFIG;
-
-
 
     return function (bid, types, opt_conf) {
         new Tracker(bid, types || Tracker.DEFAULT_CONFIG.types, opt_conf || {});
