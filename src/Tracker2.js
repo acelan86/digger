@@ -4,15 +4,6 @@ var Tracker = (function (win, doc, DEFAULT_CONFIG) {
         ref : doc.referrer,
         loc : win.location,
         ifr : win.self != win.top ? 1 : 0,
-        top : (function () {
-            var top;
-            try {
-                top = win.top.location.href;
-            } catch (e) {
-                top = util.ref;
-            }
-            return top;
-        })(),
         cookie : {
             getRaw : function (key) {
                 var reg = new RegExp("(^| )" + key + "=([^;]*)(;|\x24)"),
@@ -210,6 +201,18 @@ var Tracker = (function (win, doc, DEFAULT_CONFIG) {
             return null;
         }
     };
+
+
+    //获取top
+    util.top = (function () {
+        var top;
+        try {
+            top = win.top.location.href;
+        } catch (e) {
+            top = util.ref;
+        }
+        return top;
+    })();
 
 
     function Tracker(bid, types, opt_conf) {
